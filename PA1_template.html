@@ -351,9 +351,20 @@ length(activity.df[is.na(activity.df[,c(&#39;steps&#39;)])])
 <pre><code>## [1] 2304
 </code></pre>
 
-<p>(2) Strategy to fill in missing values: attach the mean_steps column from MeanSteps, to the data frame Activity data set. </p>
+<p>(2) Strategy to fill in missing values: </p>
 
-<pre><code class="r">activ_noNA &lt;- merge(activity.df,MeanSteps, by=&quot;interval&quot;)
+<blockquote>
+<ul>
+<li>attach the mean_steps column from MeanSteps, to the data frame Activity data set. </li>
+<li>Fill-in NA&#39;s with the mean steps (all days per interval)</li>
+</ul>
+</blockquote>
+
+<p>This is implemented as follows:</p>
+
+<pre><code class="r">## link data set containing NA&#39;s with
+## data set containing mean steps per interval
+activ_noNA &lt;- merge(activity.df,MeanSteps, by=&quot;interval&quot;)
 
 str(activ_noNA)
 </code></pre>
@@ -371,7 +382,7 @@ str(activ_noNA)
 activ_noNA &lt;- activ_noNA %&gt;% mutate(steps = ifelse(is.na(steps),mean_steps,steps))
 </code></pre>
 
-<pre><code class="r">## then check if there are still NA&#39;s on the new data frame
+<pre><code class="r">## check if there are still NA&#39;s on the new data frame
 length(activ_noNA[is.na(activ_noNA[,c(&#39;steps&#39;)])])
 </code></pre>
 

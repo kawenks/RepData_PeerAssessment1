@@ -186,10 +186,16 @@ length(activity.df[is.na(activity.df[,c('steps')])])
 ## [1] 2304
 ```
 
-(2) Strategy to fill in missing values: attach the mean_steps column from MeanSteps, to the data frame Activity data set. 
+(2) Strategy to fill in missing values: 
+> * attach the mean_steps column from MeanSteps, to the data frame Activity data set. 
+> * Fill-in NA's with the mean steps (all days per interval)
+
+This is implemented as follows:
 
 
 ```r
+## link data set containing NA's with
+## data set containing mean steps per interval
 activ_noNA <- merge(activity.df,MeanSteps, by="interval")
 
 str(activ_noNA)
@@ -213,7 +219,7 @@ activ_noNA <- activ_noNA %>% mutate(steps = ifelse(is.na(steps),mean_steps,steps
 
 
 ```r
-## then check if there are still NA's on the new data frame
+## check if there are still NA's on the new data frame
 length(activ_noNA[is.na(activ_noNA[,c('steps')])])
 ```
 
