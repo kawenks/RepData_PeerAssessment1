@@ -1,25 +1,223 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+output: html_document
+KEEP_MD: true
 ---
 
+Data for this assignment is the [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip).  
+
+Variables contained in this dataset are:  
+
+> * steps: Number of steps taken in a 5-minute interval  
+> * date: Date on which the measurement was taken, formatted in YYYY-MM-DD  
+> * interval: Identifier for the 5-minute interval in which measurement was taken.  
+   
+****
 
 ## Loading and preprocessing the data
 
+Download and unzip the dataset. Use Binary versions of **getURL** and **write** as the data is in zip/binary form.  
+
+```{r cache=TRUE}
+library(bitops)
+library(RCurl)
+arch_data <- getBinaryURL("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip", 
+               ssl.verifypeer=0L, followlocation=1L)
+writeBin(arch_data,"repdata-data-activity.zip")
+unzip("repdata-data-activity.zip")
+```
 
 
-## What is mean total number of steps taken per day?
+The zip file yields the file activity.csv.  
 
+Load the dataset into a variable.
 
+```{r}
+activity = read.csv('activity.csv', header=TRUE,sep=",",na.strings="NA")
+
+## examine the data contents 
+str(activity)
+```
+
+****
+## What is the mean total number of steps taken per day?
+
+(1) Plot a histogram of the total number of steps taken each day  
+
+```{r}
+hist(activity$steps, col='brown')
+```
+
+Shows a lot of zeroes more than any other value.
+  
+  
+  
+(2) ..and calculate the mean ...
+```{r}
+## exclude missing values from mean calculation
+mean(activity$steps,na.rm=TRUE)
+```
+  
+  
+Ok, now the median. 
+```{r}
+median(activity$steps,na.rm=TRUE)
+```
+
+****
 
 ## What is the average daily activity pattern?
 
+(1) Make a time series plot (i.e. type="l") of the 5-minute interval (x-axis) and the average number of steps taken averaged across all days (y-axis)
+  
+  
+Preprocess the data set to create average number of steps per 5-minute interval.
+
+```{r, message=FALSE}
+library(dplyr)
+
+## start with a data frame for dplyr
+activity.df <- tbl_df(activity)
+
+## create a data set containing avg steps per 5-minute interval
+MeanSteps <- activity.df %>%
+                group_by(interval) %>%
+                summarise(mean_steps = mean(steps, na.rm=TRUE))
+```
+   
+   
+Okay. So let's see what we got.
+```{r}
+str(MeanSteps)
+
+```
+
+  
+  
+Create a function that will convert the minutes into hh:mm format.
+
+```{r}
+mins2hhmm <- function(x) {
+    h <- floor(x/60)
+    m <- floor(x %% 60)
+    hhmm <- sprintf("%d:%02d", h, m)
+    return(hhmm)
+}
+```
+
+  
+Plot the average steps per interval
+```{r}
+library(ggplot2)
+ggplot(MeanSteps,aes(x=interval,y=mean_steps)) + geom_line() +
+    scale_x_continuous(name="time",labels=mins2hhmm) +
+    ylab('mean steps')
+```
 
 
-## Imputing missing values
 
 
+(2) Which 5-minute interval, on average across all the days in the dataset, containsthe maximum number of steps?
 
-## Are there differences in activity patterns between weekdays and weekends?
+That would be ..
+```{r}
+MeanSteps %>% filter(mean_steps == max(mean_steps))
+
+```
+```{r,echo=FALSE}
+maxSteps <- MeanSteps %>% filter(mean_steps == max(mean_steps))
+```
+
+The highest average-steps is `r sprintf("%8.2f",maxSteps$mean_steps)`, at interval `r maxSteps$interval`.
+
+
+****
+
+## Inputting Missing values
+
+(1) Count the number of NA's:
+
+```{r}
+## count rows where Steps is NA
+length(activity.df[is.na(activity.df[,c('steps')])])
+```
+
+(2) Strategy to fill in missing values: attach the mean_steps column from MeanSteps, to the data frame Activity data set. 
+
+```{r}
+activ_noNA <- merge(activity.df,MeanSteps, by="interval")
+
+str(activ_noNA)
+```
+
+(3) Then, perform a conditional assignment to replace NA's with the mean values per interval. Create the new complete cases data set, activ_noNA.  
+
+```{r}
+## assign mean to replace NA's
+activ_noNA <- activ_noNA %>% mutate(steps = ifelse(is.na(steps),mean_steps,steps))
+```
+
+```{r}
+## then check if there are still NA's on the new data frame
+length(activ_noNA[is.na(activ_noNA[,c('steps')])])
+
+str(activ_noNA)
+```
+
+activ_noNA now has complete cases only.  
+
+
+(4) Make a histogram of the new data set, compared against the original.
+
+```{r}
+par(mfrow=c(1,2))
+hist(activ_noNA$steps,main="NA's Filled-In", xlab="steps", col="brown")
+hist(activity$steps, main="Without NA's", xlab="steps", col="yellow")
+```
+
+It looks like the number of Zero steps increased further than the non-zero steps. Let's see if it made a difference in the Mean and Median values.
+
+```{r noNA_mean}
+## calculate mean
+mean(activ_noNA$steps)
+```
+```{r noNA_median}
+median(activ_noNA$steps)
+```
+
+Data Set | Mean | Median
+--------|---------|------------
+With NA | `r mean(activity$steps,na.rm=TRUE)` | `r median(activity$steps,na.rm=TRUE)`
+Without NA | `r mean(activ_noNA$steps)`  | `r median(activ_noNA$steps)`  
+
+From the above results the **mean** and **median** values look unchanged. There is no discernible impact, possibly because the number of zero-steps are significantly larger than the rest of the values.
+
+***
+
+## Are there differences in activity patterns between weekdays and week-ends?
+
+(1) Create a new factor, isWeekend.
+```{r}
+## to be less cryptic, breakdown the creation of the 
+## new factor into 2 steps
+activ_noNA$weekday <- weekdays(as.Date(activ_noNA$date))
+
+## now weekday values to create isWeekend
+activ_noNA$isWeekend <- factor(ifelse(activ_noNA$weekday == 'Saturday' | activ_noNA$weekday == 'Sunday','weekend', 'weekday'))
+
+## and cleanup
+activ_noNA$weekday <- NULL
+
+## let's see what we got
+str(activ_noNA)
+```
+
+
+(2) Plot the data set.
+```{r}
+p <- ggplot(activ_noNA, aes(x=interval, y=steps)) + geom_line(colour='brown')
+## make it a 2-plot panel on weekend/weekday
+p + facet_grid(. ~ isWeekend)
+```
+
+Weekdays exhibit more steps above 600 than weekends. And the steps on weekdays are skewed earlier than weekends.
